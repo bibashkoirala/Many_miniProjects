@@ -7,7 +7,7 @@ import time
 
 video_capture = cv2.VideoCapture(0)
 
-# Load Known faces
+# Load known faces
 known_face_names = {"Bibash"}
 
 known_face_encodings = []
@@ -32,6 +32,7 @@ lnwriter = csv.writer(f)
 unknown_face_count = 0  # Counter for unknown faces
 last_known_name = None  # Track the last known name
 last_known_name_time = time.time()  # Timestamp for the last known name appearance
+scanning_start_time = None  # Timestamp for the start of scanning
 
 while True:
     _, frame = video_capture.read()
@@ -60,9 +61,9 @@ while True:
             font_color = (255, 0, 0)
             thickness = 3
             line_type = 2
-            cv2.putText(frame, "You are " + name, bottom_left_corner_of_text, font, font_scale, font_color,
+            cv2.putText(frame, "Congratulations " + name, bottom_left_corner_of_text, font, font_scale, font_color,
                         thickness, line_type)
-            
+
             if name in students:
                 students.remove(name)
                 current_time = time.strftime("%H:%M:%S")
@@ -70,51 +71,36 @@ while True:
 
             last_known_name = name
             last_known_name_time = time.time()
-
-            if last_known_name is not None:
-                # Check if the last known face is no longer detected
-                if last_known_name not in face_names:
-                    # Display "not reachable, you will be signed out in 5 seconds"
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    bottom_left_corner_of_text = (10, 100)
-                    font_scale = 1.5
-                    font_color = (255, 0, 0)
-                    thickness = 3
-                    line_type = 2
-                    cv2.putText(frame, " verifing after lost connection", bottom_left_corner_of_text,
-                                font, font_scale, font_color, thickness, line_type)
-
-                    # Check if 5 seconds have passed since the last known face disappeared
-                    if time.time() + last_known_name_time > 5:
-                        break
-                else:
-                    cv2.putText(frame, "Scanning in progress...", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 3, 2)
-                    cv2.imshow("Attendance", frame)
-                    cv2.waitKey(1)
-
-
-        elif unknown_face_count >= 5:
-            print("No match found. Please input a photo.")
-            # Code to handle inputting photo and display "not verified"
-            end_time = time.time() + 20
-            while time.time() < end_time:
-                _, frame = video_capture.read()
-                cv2.putText(frame, "Not Verified. Please add Photo", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                            (255, 0, 0), 3, 2)
-                cv2.imshow("Attendance", frame)
-                cv2.waitKey(1)
-                break
+            scanning_start_time = None
 
     if len(face_names) == 0:
-        unknown_face_count += 1
+        if scanning_start_time is None:
+            scanning_start_time = time.time()
+        else:
+            scanning_duration = time.time() - scanning_start_time
+            if scanning_duration >= 30:
+                print("No one found for 30 seconds. Exiting...")
+                break
     else:
-        unknown_face_count = 0
+        scanning_start_time = None
 
-    
-   
     # Check termination conditions
-    if last_known_name is not None and (time.time() - last_known_name_time) > 10:
+    if last_known_name is not None and (time.time() - last_known_name_time) > 5:
+        print(" Thank you " + name)
         break
+
+    # Display "Scanning in progress" if no match is found
+    if len(face_names) == 0:
+        cv2.putText(frame, "Scanning in progress...", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 0, 0), 3, 2)
+
+    cv2.imshow("Attendance", frame)
+    cv2.waitKey(1)
+
+# Display attendance message
+if len(students) == 0:
+    print("Attendance successful.")
+else:
+    print("Attendance incomplete. Missing students:", students)
 
 video_capture.release()
 cv2.destroyAllWindows()
